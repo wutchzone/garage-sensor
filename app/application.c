@@ -1,41 +1,34 @@
-#include <application.h>
+#include <bcl.h>
+#include <bc_usb_cdc.h>
 
-// LED instance
 bc_led_t led;
 
-// Button instance
-bc_button_t button;
+bc_lis2dh12_t a;
+bc_lis2dh12_result_g_t a_result;
 
-void button_event_handler(bc_button_t *self, bc_button_event_t event, void *event_param)
+void lis2_event_handler(bc_lis2dh12_t *self, bc_lis2dh12_event_t event, void *event_param)
 {
-    if (event == BC_BUTTON_EVENT_PRESS)
-    {
-        bc_led_set_mode(&led, BC_LED_MODE_TOGGLE);
-    }
+    (void)self;
+    (void)event_param;
 
-    // Logging in action
-    bc_log_info("Button event handler - event: %i", event);
+    if (event == BC_LIS2DH12_EVENT_UPDATE)
+    {
+        bc_lis2dh12_get_result_g(&a, &a_result);
+        char message[100];
+        sprintf(message, "X: %f\r\nY: %f\r\nZ: %f\r\n", a_result.x_axis, a_result.y_axis, a_result.z_axis);
+        bc_usb_cdc_write(message, strlen(message));
+    }
+    else
+    {
+        bc_usb_cdc_write("error\r\n", strlen("error\r\n"));
+    }
 }
 
 void application_init(void)
 {
-    // Initialize logging
-    bc_log_init(BC_LOG_LEVEL_DUMP, BC_LOG_TIMESTAMP_ABS);
+    bc_lis2dh12_init(&a, BC_I2C_I2C0, 0x19);
+    bc_lis2dh12_set_event_handler(&a, lis2_event_handler, NULL);
+    bc_lis2dh12_set_update_interval(&a, 1000);
 
-    // Initialize LED
-    bc_led_init(&led, BC_GPIO_LED, false, false);
-    bc_led_set_mode(&led, BC_LED_MODE_ON);
-
-    // Initialize button
-    bc_button_init(&button, BC_GPIO_BUTTON, BC_GPIO_PULL_DOWN, false);
-    bc_button_set_event_handler(&button, button_event_handler, NULL);
-}
-
-void application_task(void)
-{
-    // Logging in action
-    bc_log_debug("application_task run");
-
-    // Plan next run this function after 1000 ms
-    bc_scheduler_plan_current_from_now(1000);
+    bc_usb_cdc_init();
 }
